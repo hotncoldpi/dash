@@ -1,0 +1,103 @@
+<html>
+
+<head>
+    <title>Temperatures</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="//ajax.aspnetcdn.com/ajax/jquery/jquery-1.9.0.js"></script>
+    <script src="gauge.min.js"></script>
+	
+</head>
+
+<body>
+	<center>
+		<canvas id='testcan' style="float:center;"></canvas>
+		<br/>
+		<canvas id='humidity' style="float:center;display:none;"></canvas>
+		<br/>
+		<label id='agent'>Loading...</label><br/>
+		<br/>
+		<select style='width:250px;' size=5 id='agents' onchange="setAgent();" ></select>
+		<br/>&nbsp;
+		<br/><br/><a href='/WebApp'>Show Dashboard</a>
+	</center>
+
+    <script type="text/javascript">
+	//https://canvas-gauges.com/documentation/examples/
+	var gauge = new RadialGauge({renderTo: 'testcan', height: 250, width: 250, units:'Farenheit'});
+	var gauge2 = new RadialGauge({renderTo: 'humidity', height: 250, width: 250, units:'% Humidity', colorPlate:"#0ff"});
+	var currentAgent = '';
+	var intervalID = -1;
+	init();
+
+	function init() {
+		gauge.draw();
+		gauge2.draw();
+		gauge.value = 0;
+		gauge2.value = 0;
+		intervalID = setInterval(setGauge,5000);				
+	}
+
+	function setAgent() {
+		currentAgent = $('#agents').val();
+		$('#agent').text($('#agents option:selected').text());
+		gauge.value = '0';
+		gauge2.value = '0';
+		//gauge = new RadialGauge({title: x, renderTo: 'testcan', width: 300, units:'Farenheit'});
+		//gauge.title = 'x'; //$('#agents option:selected').text();
+	}
+
+	function setGauge() {
+		$.getJSON('/WebApp/api/products' + "?active=y").done(function(data) {
+			if ($('#agent').text() == 'Loading...')
+				$('#agent').text('Select agent');
+			
+			$('#agents').empty();
+			for (var i = 0; i < data.length; i++) {
+				if (data[i].name == null) 
+				{
+					if (data[i].Id == 0 || data[i].Name == "" || data[i].Profile != 'temperature') {continue}
+					var option = new Option(data[i].Name, data[i].Id);
+					$('#agents').append($(option));
+					if (data[i].Id != currentAgent) continue;
+					var index = data[i].FirstLine.indexOf('ture ');
+					if (index == -1 || data[i].FirstLine.slice(0, -1) != 'F')
+					{
+						var found = data[i].FirstLine.match(new RegExp('([.0-9]+)[CF]','i'));
+						if (found != null)
+							gauge.value = found[1];
+						else
+							gauge.value = '100';
+							
+						found = data[i].FirstLine.match(new RegExp('([.0-9]+)%RH','i'));
+						if (found != null) {
+							gauge2.value = found[1];
+							$('#humidity').css('display','inline');
+							//$('#humidity').css('float','left');
+							//$('#testcan').css('float','left');
+						} else {
+							$('#humidity').css('display','none');
+						}
+					}
+					else
+					{
+						gauge.value = data[i].FirstLine.substring(index + 5);
+						$('#humidity').css('display','none');
+					}
+				}
+				else
+				{
+					if (data[i].id == 0 || data[i].name == "" || data[i].profile != 'temperature') {continue}
+					var option = new Option(data[i].name, data[i].id);
+					$('#agents').append($(option));
+					if (data[i].id != currentAgent) continue;
+					var temperature = data[i].firstLine.substring(data[i].firstLine.indexOf('ture ') + 5);
+					gauge.value = temperature;
+				}
+			}
+		}).error(function(jqXHR, text) {alert(jqXHR.status); clearInterval(intervalID);}
+		);
+	}
+    </script>
+</body>
+
+</html>

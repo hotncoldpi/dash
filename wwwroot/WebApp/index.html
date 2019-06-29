@@ -1,0 +1,1804 @@
+<html>
+
+<head>
+    <title>Scrapers</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+    <script src="//ajax.aspnetcdn.com/ajax/jquery/jquery-1.9.0.js"></script>
+    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+    <script src="//ajax.aspnetcdn.com/ajax/knockout/knockout-2.2.1.js"></script>
+	<script src="//unpkg.com/node-forge@0.7.0/dist/forge.min.js"></script>
+<!--
+<script type="text/javascript" src="_jsbn.js"></script>
+<script type="text/javascript" src="_prng4.js"></script>
+<script type="text/javascript" src="_rng.js"></script>
+<script type="text/javascript" src="_rsa.js"></script>
+<script type="text/javascript" src="_jsencrypt.js"></script>
+-->
+</head>
+
+<body>
+    <div id="titlebar" class="navbar">
+        <div class="navbar-inner">
+            <a style='display: inline-block;' class="brand" href="#">Agents Dashboard</a>
+			<label style='padding:8px; display: inline-block;' data-bind="text:username"></label>
+			<label style='padding:8px; display: inline-block; color:red;' data-bind="text:jobalertlink, click: showAlert"></label>
+			<div style="float:right;">
+				Page Refresh Rate<br/>
+				<label style='display: inline-block;'>1</label>
+				<input style='display: inline-block;' id="slider" type="range" min="1" max="30" data-bind="value:refreshRate, click: adjustSlider"/>
+				<label style='display: inline-block;'>30</label>
+			</div>
+        </div>
+    </div>
+
+    <div id="main" class="container">
+	<div data-bind='if:platform'>
+        <span>
+			<label style="color:red">Windows</label>
+			Profile Filter&nbsp;<input style="height:25px;vertical-align:top;" type="text" data-bind="value:filter" >
+			<button class="btn" data-bind="click:pressedInvert">Invert</button>
+			<button class="btn" data-bind="click:pressedClear">Clear</button>
+        </span>
+		
+		<span>
+			&nbsp;&nbsp;&nbsp;&nbsp;<input type=checkbox data-bind="checked:unusedOnly" style="padding-left:10px;vertical-align:top;"></input>
+			<label style="padding-left:1px;vertical-align:top;display:inline-block;">Show Unused Agents</label>
+		</span>
+		<!--
+        <a target='blank' href='/WebApp/Log' style="display:inline-block;color:blue;">Historical Data</a>&nbsp;
+        <a target='blank' href='users.html' style="display:inline-block;color:blue;">User Info</a><br/>
+		-->
+		
+		<label data-bind='if:false'>
+			<input type=checkbox data-bind="checked:sortByHost" style="vertical-align:top;"></input>
+			Sort By Name
+		<label>
+	</div>
+
+	<label data-bind="if:globTime().length > 0">
+		<b>Direct report time:</b> 
+	</label>
+	<label data-bind="text:globTime"></label>
+
+<div>	
+        <label style="float:right;">
+            <input type=checkbox data-bind="checked:activeOnly" style="vertical-align:top;"></input>
+            Active
+        </label>
+        <label style="float:right;">
+            <input type=checkbox data-bind="checked:verbose" style="vertical-align:top;"></input>
+            Detail Columns&nbsp;&nbsp;
+        </label>
+        <label style="float:right;" data-bind="visible:isadmin">
+            <input type=checkbox data-bind="checked:cmdresp" style="vertical-align:top;"></input>
+            Command Columns&nbsp;&nbsp;
+        </label>
+		<label style="float:right;">
+            &nbsp;agent(s)&nbsp;&nbsp;&nbsp;&nbsp;
+        </label>
+        <label style="float:right;" data-bind="text:taskCount"></label>
+		<label style="margin-left:auto;margin-right:auto;float:left;" data-bind="visible:verbose">
+			Desc Filter&nbsp;&nbsp;&nbsp;<input style="height:25px;width:200px;vertical-align:top;" type="text" data-bind="value:descfilter" >
+			&nbsp;
+        </label>
+</div>	
+		<div class="dropdown" style="width:100;">
+		  <button style="background:none;border:none;" class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">Options<span class="caret"></span>
+		  </button>
+		  <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+			<li><a href="#" data-bind="click: openEmailDialog">Email Config</a></li>
+			<li><a href="#" data-bind="click: openServerDialog">Server Info</a></li>
+			<li><a href="users.html" target='blank'>User Info</a></li>
+			<li data-bind='if:platform'><a href="/WebApp/Log?agefilter=.1" target='blank'>Historical Data</a></li>
+			<li data-bind='if:platform'><a href="/WebApp/jobs.html" target='blank'>Jobs</a></li>
+			<!--
+			<li role="separator" class="divider"></li>
+			-->
+		  </ul>
+		</div>
+
+        <table class="table table-striped">
+            <tr>
+                <td><label data-bind="visible:showVerboseAdminColumnWindows()"><b></b></label></td>
+                <td><label data-bind="visible:showVerboseAdminColumn()"><b></b></label></td>
+                <td><label data-bind="visible:verbose"><b>ID</b></label></td>
+                <td><label style="color:blue;" data-bind="click:pressedName"><b>Name</b></label></td>
+                <td><label data-bind="visible:verbose"><b>Desc</b></label></td>
+                <td><label data-bind="visible:verbose"><b>LAN IP</b></label></td>
+                <td><label data-bind="visible:verbose"><b>WAN IP</b></label></td>
+                <td><label data-bind="visible:verbose"><b>Version</b></label></td>
+                <td><label data-bind="visible:verbose"><b>OS</b></label></td>
+                <td><label data-bind="visible:verbose"><b>Age</b></label></td>
+                <td><label><b>Profile</b></label></td>
+                <td><label><b>Summary</b></label></td>
+                <td><label><b>Time</b></label></td>
+                <td><label data-bind="visible:cmdresp"><b>Command</b></label></td>
+                <td><label data-bind="visible:cmdresp"><b>Response</b></label></td>
+                <td><label data-bind="visible:cmdresp"><b>Status</b></label></td>
+                <td><label data-bind="visible:cmdresp"><b>Percent</b></label></td>
+                <td></td>
+            </tr>
+            <!-- ko foreach: tasks -->
+            <tr>
+                <td>
+                    <label style='color:blue;' data-bind="click: $parent.openUserDialog, visible:$parent.showVerboseAdminColumnWindows()">+-</label>
+                </td>
+			
+                <td>
+                    <label style='color:blue;' data-bind="click: $parent.deleteAgent, visible:$parent.showVerboseAdminColumn()">X</label>
+                </td>
+                <td>
+                    <label data-bind="text: ID, visible:$parent.verbose"></label>
+                </td>
+                <td>
+                    <a target="blank" data-bind="text:Name, attr: {href:IP2URL2}"></a>
+                </td>
+                <td>
+                    <label style="color:blue;" data-bind="text: Desc, visible:$parent.verbose, click: $parent.pressedDesc"></label>
+                </td>
+                <td>
+                    <label data-bind="text: IP, visible:$parent.verbose"></label>
+                </td>
+                <td>
+                    <a target="blank" data-bind="text:IP2, attr: {href:IP2URL}, visible:$parent.verbose"></a>
+                </td>
+                <td>
+                    <label data-bind="text: Version, visible:$parent.verbose"></label>
+                </td>
+                <td>
+                    <label data-bind="text: OS, visible:$parent.verbose"></label>
+                </td>
+                <td>
+                    <label data-bind="text: Output, visible:$parent.verbose"></label>
+                </td>
+                <td>
+                    <label data-bind="text: Profile, click: $parent.pressedProfile"></label>
+                    <label style='color:blue;' data-bind="click: $parent.openDialog, visible:Profile() != null">Config
+                        <img data-bind="visible:Profile() == 'temperature'" src="temperature.gif" style='height:30px;'>
+                    </label>
+                </td>
+                <td>
+                    <label data-bind="text: FirstLine, attr: {title: SecondLine}, style: {color: AlertColor}"></label>
+					<label style='color:blue;' data-bind="click: $parent.openDetailsDialog">Details</label>
+                </td>
+                <td>
+                    <label data-bind="text: Time, style: {color: Color}"></label>
+                </td>
+                <td>
+                    <label data-bind="text: Command, visible:$parent.cmdresp"></label>
+                </td>
+                <td>
+                    <label data-bind="text: Response2, style: {color: ResponseColor}, visible:$parent.cmdresp, click:$parent.showResponse"></label>
+                </td>
+                <td>
+                    <label data-bind="text: Status, visible:$parent.cmdresp"></label>
+					<a target="blank" data-bind="visible:$parent.cmdresp() && ShowDetails, attr: {href:Details}">Files</a>
+                </td>
+                <td>
+                    <label data-bind="text: Percent, visible:$parent.cmdresp"></label>
+                </td>
+                <td>
+					<input type=checkbox data-bind="checked:Selected, visible:$parent.cmdresp"></input>
+                </td>
+            </tr>
+            <!-- /ko -->
+        </table>
+        
+		<button class="btn" data-bind="visible:showVerboseAdminColumn(), click:addAgent">Add Agent</button>
+		<button class="btn" data-bind="visible:cmdresp, click:sendCommand" style="float:right;">Send Command</button>
+		<input style="height:25px;vertical-align:top;float:right;" type="text" class='form-control input-lg' data-bind="value:commandAllTextbox, visible:cmdresp" >
+		<select data-bind="visible:cmdresp, value:commanddropdownValue, event:{ change: dropdownChanged}" style="float:right;">
+			<option value="">Select...</option>
+			<option value="go0">List</option>
+			<option value="doScan">Scan</option>
+			<option value="stop1">Stop</option>
+			<option value="loadProfileByName ">Load Profile</option>
+			<option value="setProperty testmode 1">Enable Test Mode</option>
+			<option value="setProperty testmode 0">Disable Test Mode</option>
+		</select>
+		
+		<br/>
+    </div>
+
+    <div id="emailconfig" class="modal hide" tabindex="=1" role="dialog" aria-labelledby="emailDialogLabel" aria-hidden="true">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">X</button>
+            <h3 id="emailDialogLabel"><img style='height:40px;' src='scraper-brown.jpg'>Alert Email Setup</h3>
+        </div>
+        <div id="emailbody" class="modal-body">
+			<label data-bind="text:rawconfig" style='float:middle;'></label><br/>
+			
+			<label data-bind="text:destaddie" style='float:middle;display: inline-block;'></label>
+			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="text" class='form-control' data-bind="value:destaddietext" style="height:25px;width:250px;vertical-align:top;" >
+			<br/>
+			<label data-bind="text:senderaddie" style='float:middle;display: inline-block;'></label>
+			&nbsp;&nbsp;&nbsp;
+			<input type="text" class='form-control' data-bind="value:senderaddietext" style="height:25px;width:250px;vertical-align:top;" >
+			<br/>
+			
+			<label data-bind="text:serveraddie" style='float:middle;display: inline-block;'></label>
+			&nbsp;
+			<input type="text" class='form-control' data-bind="value:serveraddietext" style="height:25px;width:250px;vertical-align:top;" >
+			<br/>
+
+			<label data-bind="text:portnumber" style='float:middle;display: inline-block;'></label>
+			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+			<input type="text" class='form-control' data-bind="value:portnumbertext" style="height:25px;width:250px;vertical-align:top;" >
+			<br/>
+			
+			<label data-bind="text:authtype" style='float:middle;display: inline-block;'></label>
+			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+			<input type="text" class='form-control' data-bind="value:authtypetext" style="height:25px;width:250px;vertical-align:top;" >
+			<br/>
+			
+			<label data-bind="text:authuser" style='float:middle;display: inline-block;'></label>
+			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+			<input type="text" class='form-control' data-bind="value:authusertext" style="height:25px;width:250px;vertical-align:top;" >
+			<br/>
+			
+			<br/>
+			<button class="btn" data-bind="click:saveemailconfig" id='adduserbutton' >Save Config</button>
+		</div>
+    </div>
+	
+    <div id="usersconfig" class="modal hide" tabindex="=1" role="dialog" aria-labelledby="usersDialogLabel" aria-hidden="true">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">X</button>
+            <h3 id="usersDialogLabel"><img style='height:40px;' src='scraper-brown.jpg'>Users</h3>
+        </div>
+        <div id="usersbody" class="modal-body">
+			<label data-bind="text:agentmsg" style='float:middle;display: inline-block;'></label>
+			<a style="float:right;" data-bind="attr: {href:agenturl}" target='blank'>Show Users</a><br/>
+			<select id='selectusers' size=15 style="width:500px;" data-bind="options:dropdownOptions,value:dropdownValue">
+			</select><br/>
+			<button class="btn" data-bind="click:addUser" id='adduserbutton' >Add User To Agent</button>
+			<button class="btn" data-bind="click:delUser" id='deluserbutton' >Remove User From Agent</button>
+		</div>
+    </div>
+	
+    <div id="details" class="modal hide" tabindex="=1" role="dialog" aria-labelledby="detailsDialogLabel" aria-hidden="true">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">X</button>
+            <h3 id="detailsDialogLabel"><img style='height:40px;' src='scraper-brown.jpg'>Details</h3>
+        </div>
+        <div id="detailsbody" class="modal-body">
+			<label data-bind="text:hostmsg" style='float:left;'></label>&nbsp;
+			<a data-bind="if:platform, attr: {href:historyurl}" target="blank">Historical Data</a>
+			<label data-bind="text:profilemsg" style='float:right;'></label>
+			<a href='#' data-bind="if:platform,click:toggleDetails" style='float:right;'>Toggle View&nbsp;</a>
+			<br/><br/>
+			<button class="btn" data-bind="click:getDetails" id='reloadbutton' >Reload</button>
+			<button class="btn" data-bind="visible:dropdownVisible,click:listSelected">List</button>
+			<button class="btn" data-bind="visible:dropdownVisible,click:scanSelected">Scan</button>
+			<button class="btn" data-bind="visible:dropdownVisible,click:profilesSelected" style='float:right;'><img style='height:20px;' src='reload.gif'></button>
+			<select id='selectprofile' style="width:100px;float:right;" 
+				data-bind="visible:dropdownVisible,options:profileOptions,value:profileValue,event:{ change: dropdownChanged2}"></select>
+			
+			<span data-bind='if:loading() && dropdownVisible()'>
+				<img src='progress.gif' style='float:middle;height:40px;'>
+			</span>
+			<br/><br/>
+			
+			<div data-bind="visible:dropdownVisible">
+				<label data-bind="text:statusmsg"></label>
+				<label data-bind="text:percentmsg"></label>
+				<br/>
+			</div>
+			
+			<label data-bind="visible:!dropdownVisible(), html:output"></label>
+			<select id='selectscan' multiple size=15 style="width:500px;" data-bind="visible:dropdownVisible, optionsText: 'Text', options:dropdownOptions,  selectedOptions:selectedopts, event:{ change: dropdownChanged} ">
+			</select><br/>
+			<div data-bind="visible:dropdownVisible">
+				<input type="checkbox" data-bind="checked:preview" style="vertical-align:top;">Preview
+				<span data-bind="visible:preview()">
+					&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" data-bind="checked:preview2,click:doPreview" style="vertical-align:top;"><label style="display: inline-block;color:black;">Auto Refresh</label>
+					<label style="display: inline-block;color:black;float:right;" data-bind="text:previewlabel"></label>
+				</span>
+			</div>
+			<center>
+			<a href="http://yahoo.com" data-bind="attr: {href:previewurl}" target="blank">
+				<img id="preview" style='height:200px;' data-bind="visible:dropdownVisible() && preview()">
+			</a>
+			</center><br/><br/>
+		</div>
+    </div>
+	
+    <div id="config" class="modal hide" tabindex="=1" role="dialog" aria-labelledby="addDialogLabel" aria-hidden="true">
+        <div class="modal-header" data-bind="style: {color: backColor}">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">X</button>
+            <h3 id="addDialogLabel"><img style='height:40px;' src='scraper-brown.jpg'>Configuration</h3>
+        </div>
+        <div id="configbody" class="modal-body">
+            <div class="form-group">
+                <label data-bind="text:command, visible:debug"></label>
+                <label data-bind="text:response, visible:debug"></label>
+					<select style="width:150px;" data-bind="value:debugdropdownValue, visible:debug, event:{ change: debugdropdownChanged}">
+						<option value="">Select...</option>
+						<option value="setProperty testmode 1">Enable Test Mode</option>
+						<option value="setProperty testmode 0">Disable Test Mode</option>
+						<option value="replayErrors">Replay Data</option>
+						<option value="replayCount">Get Replay Count</option>
+						<option value="replayDelete">Delete Replay File</option>
+					</select>
+				<input style="height:25px;vertical-align:top;" type="text" class='form-control input-lg' data-bind="value:commandTextbox, visible:debug" >
+                <button style="vertical-align:top;" class="btn" data-bind="click: sendCmd, visible:debug">Send Command</button>
+                <div data-bind='if:debug'><hr></div>
+            </div>
+            
+            <div style="float:right;">
+				<label style="display: inline-block;color:blue;" data-bind="click: agentinfo">?&nbsp;</label>
+				Debug
+                <input type="checkbox" data-bind="checked:debug,enable:true" style="vertical-align:top;">
+            </div>
+			
+            <label style="display: inline-block;color:blue;" data-bind="text:hostname,click: rename"></label>
+			<input type="text" class='form-control' data-bind="value:newhost,visible:newhostvisible" style="height:25px;width:100px;vertical-align:top;" >
+            <button class="btn" data-bind="click:rename2, enable:inited() && !loading(),visible:newhostvisible" style="">Save</button>
+			<a target="blank" style='color:red;' data-bind="text:mainserver, attr: {href:mainserver}"></a>
+            <br/>
+			<label style="display: inline-block;color:blue;" data-bind="text:hostdesc,click: renamedesc"></label>
+			<input type="text" class='form-control' data-bind="value:newdesc,visible:newdescvisible" style="height:25px;width:300px;vertical-align:top;" >
+            <button class="btn" data-bind="click:renamedesc2, enable:inited() && !loading(),visible:newdescvisible" style="">Save</button>
+            
+			<label data-bind="text:interval"></label>
+
+            <div data-bind='if:loading'>
+                <img src='progress.gif' style='float:right;height:40px;'>
+            </div>
+            
+            <label style='display: inline-block;'>2</label>
+            <input style='display: inline-block;' type="range" min="2" max="10" data-bind="value:refreshRate, click: setPollingInterval, enable:inited() && !loading()"/>
+            <label style='display: inline-block;'>10</label>
+<br/><br/><label style="float:left;vertical-align:bottom;"></label>
+            <button class="btn" data-bind="click:pressedMore, visible:moreVisible()" style="float:left;">Update...</button>
+            <select data-bind="enable:inited, value:dropdownValue2, visible:moreoptions" style="float:left;">
+                <option value="1">Push Profile</option>
+                <option value="5">Push Site</option>                    
+                <option value="2">Push Agent</option>
+                <option value="3">Deploy Agent</option>
+                <option value="4">Query Version</option>                    
+            </select>
+            <button class="btn" data-bind="click:pressedGo, visible:moreoptions, enable:inited() && !loading()" style="float:left;">Go</button>
+     <br/>       
+            <div data-bind="if:showRange">
+                <hr><b>Basic Alert Settings</b>
+                <br/>
+                <br/>
+                <label style='padding:4px; display: inline-block;vertical-align:top;'>Range</label>
+                <input type="text" class='form-control' data-bind="value:range2,enable:inited" style="height:25px;width:100px;vertical-align:top;" >
+                &nbsp;
+                <label data-bind="text:enabled" style="display: inline-block;"></label>
+                <input type="checkbox" data-bind="checked:enabled2,enable:inited" style="vertical-align:top;">
+                </input>&nbsp;
+                <button class="btn" data-bind="click: save, enable:inited() && !loading()">Save</button>
+            
+                <br/>
+                <br/>
+                <b>Advanced Alert Settings</b>&nbsp;<input type=checkbox data-bind="checked:showadvanced" style="vertical-align:top;"></input>
+                <br/>
+                <br/>
+				<!--
+				<button class="btn" data-bind="click:pressedShow, visible:showVisible()" style="float:left;">Show...</button>
+				-->
+                <div data-bind="if:showadvanced">
+					<select data-bind="enable:inited, value:dropdownValue">
+						<option value="1">Query Stats</option>
+						<option value="2">Query Email Config</option>
+						<option value="3">Copy Email Config</option>
+						<option value="4">Send Email Config</option>                    
+						<option value="5">Test Alert</option>
+						<option value="6">Get Public Key</option>
+					</select>
+					<button class="btn" style="vertical-align:top;" data-bind="click: dropdownGo, enable:!loading()">Go</button>
+					<br/>
+					<div>
+						<label style='display: inline-block;vertical-align:top;'>Report Offset</label>&nbsp;&nbsp;
+						<input type="text" title="test" class='form-control' data-bind="value:offset" style="height:25px;width:100px;vertical-align:top;">
+						<button class="btn" data-bind="click: saveOffset, enable:inited() && !loading()" title="Sets when the daily stats are reported, offset from the current time. Example: 30m, 4h">Set Offset</button><br/>
+						<label style='display: inline-block;vertical-align:top;'>Alert Password</label>
+						<input type="password" title="test" class='form-control' data-bind="value:password" style="height:25px;width:100px;vertical-align:top;">
+						<button class="btn" data-bind="click: savePassword, enable:inited() && !loading()" title="Sets the password associated with the email configuration.">Set Password</button><br/>						
+					</div>
+				</div>
+            </div>
+            <hr>
+            Response
+            <label id="responseLabel" data-bind="html:errorMsg" style='color:red;'></label>
+        </div>
+<!--
+        <div class="modal-footer">
+		<select data-bind="enable:inited, value:dropdownValue2" style="float:left;">
+                <option value="1">Push Profile</option>
+                <option value="2">Push Agent</option>
+                <option value="3">Deploy Agent</option>
+                <option value="4">Query Version</option>                    
+            </select>
+            <button class="btn" data-bind="click:pressedGo, enable:inited() && !loading()" style="float:left;">Go</button>
+			-->
+    <!--
+            <button class="btn" data-bind="click:download, enable:inited" style="float:left;">Push Agent</button>
+            <button class="btn" data-bind="click:deploy, enable:inited" style="float:left;">Deploy Agent</button>
+            <button class="btn" data-bind="click:queryversion, enable:inited" style="float:left;">Query Version</button>
+            <button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
+        </div>
+    -->
+    </div>
+
+<div id="rightclicked" style="background-color: rgb(200, 200, 200);z-index: 100000; width:150px;height: auto; position: absolute; display: none;">
+  <ul style="margin: 0px; padding: 0px; text-align: center; list-style-type: none; text-indent: 0px">
+    <a onclick='dothecopy();' href="#">
+      <li style="border-top: none; margin-top: -1px">
+        <p>Copy</p>
+      </li>
+    </a>
+    <a onclick='dothescan();' href="#">
+      <li style="border-top: none; margin-top: -1px">
+        <p>Scan</p>
+      </li>
+    </a>
+    <a onclick='dothestop();' href="#">
+      <li style="border-top: none; margin-top: -1px">
+        <p>Stop Scan</p>
+      </li>
+    </a>
+    <a onclick='dothegetlog();' href="#">
+      <li style="border-top: none; margin-top: -1px">
+        <p>Get Log</p>
+      </li>
+    </a>
+  </ul>
+</div>
+	
+    <script type="text/javascript">
+
+    function TaskEmailViewModel() {
+        var self = this;
+		self.tvm = null;
+		self.rawconfig = ko.observable('test');
+		self.destaddie = ko.observable('To');
+		self.destaddietext = ko.observable('');
+		self.senderaddie = ko.observable('From');
+		self.senderaddietext = ko.observable('');
+		self.serveraddie = ko.observable('Server');
+		self.serveraddietext = ko.observable('');
+		self.portnumber = ko.observable('Port');
+		self.portnumbertext = ko.observable('');
+		self.authtype = ko.observable('Auth');
+		self.authtypetext = ko.observable('');
+		self.authuser = ko.observable('User');
+		self.authusertext = ko.observable('');
+
+        self.init = function(config, main) {
+			//alert(config);
+			self.tvm = main;
+			self.rawconfig(config);
+			var lines = config.split('<br/>');
+			self.destaddietext(lines[0]);
+			if (lines.length >= 2) self.senderaddietext(lines[1]);
+			if (lines.length >= 3) self.serveraddietext(lines[2]);
+			if (lines.length >= 4) self.portnumbertext(lines[3]);
+			if (lines.length >= 5) self.authtypetext(lines[4]);
+			if (lines.length >= 6) self.authusertext(lines[5]);
+			
+			//alert(lines.length);
+		}
+		self.saveemailconfig = function() {
+			self.rawconfig(
+				self.destaddietext() + '<br/>' +
+				self.senderaddietext() + '<br/>' +
+				self.serveraddietext() + '<br/>' +
+				self.portnumbertext() + '<br/>' + 
+				self.authtypetext() + '<br/>' +
+				self.authusertext()
+				);
+			self.tvm.popup.copiedConfig = self.rawconfig();
+		}
+	}
+	
+    function TaskUsersViewModel() {
+        var self = this;
+        self.tasksURI = '/WebApp/api/users';
+		self.dropdownOptions = ko.observableArray();
+		self.dropdownValue = ko.observable();
+		self.agentmsg = ko.observable('test');
+		self.agenturl = ko.observable('users.html');
+		self.agentname = '';
+		
+		self.addUser = function() {
+			self.adddelUser('0');
+		}
+		self.delUser = function() {
+			self.adddelUser('1');
+		}
+		
+        self.adddelUser = function(userid) {
+			if (self.dropdownValue() == null || self.dropdownValue() == '')
+				alert('Make a selection');
+			else
+			{
+				ajax('/WebApp/api/users/'+userid, "PUT", { "Name": self.dropdownValue(), "Ids": self.agentname }).done(function (data) {
+					//self.load();
+					$('#usersconfig').modal('hide');
+				});
+				
+			}
+		}
+		
+        self.init = function(name) {
+			self.dropdownValue(' ');
+			self.agentname = name;
+			self.agentmsg('Agent ID: ' + name);
+			self.agenturl('users.html?x='+name);
+			self.dropdownOptions.removeAll();
+            $.getJSON(self.tasksURI).done(function(data) {
+				for (var i = 0; i < data.length; i++) {
+                    self.dropdownOptions.push(data[i].Name);
+                }
+			});
+		}
+	}
+	
+    function TaskDetailsViewModel() {
+        var self = this;
+		self.output = ko.observable();
+		self.hostmsg = ko.observable('test');
+		self.profilemsg = ko.observable('test');
+		self.historyurl = ko.observable('');
+		self.platform = ko.observable(true);
+		
+		self.statusmsg = ko.observable('test');
+		self.percentmsg = ko.observable('test');
+		self.dropdownVisible = ko.observable(false);
+		//self.dropdownValue = ko.observable();
+		self.dropdownOptions = ko.observableArray();
+		self.selectedopts = ko.observableArray();
+		self.preview = ko.observable(true);
+		self.preview2 = ko.observable(false);
+		self.previewlabel = ko.observable('test');
+		self.previewurl = ko.observable('');
+		self.loading = ko.observable(false);
+		self.id = -1;
+		self.inited = false;
+		self.profileOptions = ko.observableArray();
+		self.profileValue = ko.observable('');
+		self.imginterval = -1;
+		self.hash = '';
+		self.inprogress = false;
+		
+		self.resetImage = function() {
+			var url = self.previewurl();
+			var index = url.indexOf('?x=');
+			if (index != -1)
+				url = url.substring(0, index);
+			else 
+			{
+				index = url.indexOf('&x=');
+				if (index != -1)
+					url = url.substring(0, index);
+			}
+
+			var appendix = '?x=';
+			var dateUrl = url;
+			if (url.indexOf('?') != -1) 
+			{
+				appendix = '&x=';
+				//extract query args to build date.txt url
+				var filename = url.substring(9+url.indexOf('filename='));
+				var agentid = url.substring(8+url.indexOf('agentid='));
+				index = agentid.indexOf('&');
+				if (index != -1)
+					agentid = agentid.substring(0, index);
+				dateUrl = '/WebApp/logs/' + agentid + '/' + filename;
+			}
+			
+			
+			var result = $.get(dateUrl +'_date.txt?x=' + Date.now());
+			result
+				.done(function(data) {
+					self.previewlabel(data);
+				})
+				.error(function(data) {
+					self.previewlabel('');
+				});
+				
+			url = url + appendix + Date.now();
+			self.previewurl(url);
+			$('#preview').attr('src',url);
+			
+		}
+		
+		self.doPreview = function() {
+			if (self.preview2()) {
+				self.imginterval = setInterval(self.resetImage, 2000);
+			} else {
+				clearInterval(self.imginterval);
+			}
+			return true;
+		}
+		
+		self.dropdownChanged2 = function(obj, sel) {
+			if (self.profileValue() != null && self.profileValue() != 'Select...')
+				//alert(self.profileValue());
+				var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"loadProfileByName " + self.profileValue()});
+		}
+		self.dropdownChanged = function(obj, sel) {
+			var v = null;
+			self.selectedopts().forEach(function (s) {
+				v = s.Value;
+			});
+			
+			if (v != null) {
+				//alert(v.Value);
+				$('#preview').attr('src',v);
+				self.previewurl(v);
+				//alert(v);
+			
+			//TODO:test for WebApp and derive date link
+			var result = $.get(v+'_date.txt');
+			result
+				.done(function(data) {
+				self.previewlabel(data);
+				});
+				
+			}
+		}
+
+        self.update = function(id2, status, percent, cmd, resp, profile, outputhash) {
+            if (typeof self.id == 'undefined' || self.id != id2)
+                return;
+				
+			if (outputhash != self.hash) 
+			{
+				self.hash = outputhash;
+				self.getDetails();
+				//alert('get data');
+			}
+			
+			if (profile != null)
+				self.profilemsg("Profile: " + profile);
+				
+			if (cmd == null || resp == null)
+				return;
+				
+            //parse cmdnum
+			var index = cmd.indexOf(':');
+            if (index == -1) return;
+            var cmdNum = cmd.substring(0, index);
+            var cmdNam = cmd.substring(index + 1);
+			
+            //parse respnum
+            var respError = false;
+			index = resp.indexOf('.');
+            if (index == -1)
+			{
+                index = resp.indexOf(':');
+				respError = true;
+			}
+            else 
+            {
+                var index2 = resp.indexOf(':');
+                if (index2 != -1 && index2 < index)
+                    index = index2;
+            }
+            if (index == -1) return;
+            var rspNum = resp.substring(0, index);
+            var rspMsg = resp.substring(index + 1);
+
+			self.loading(cmdNum != rspNum);
+
+			if (cmdNum == rspNum && cmdNam == 'listprofiles' && !self.inited)
+			{
+				self.inited = true;
+				//alert(rspMsg);
+				self.profileOptions.removeAll();
+				self.profileOptions.push('Select...');
+				rspMsg.split(',').forEach(
+					function (s){
+						if (s.length > 0 && respError == false)
+							self.profileOptions.push(s);
+						//alert(s);
+					});
+				if (respError)
+					alert(rspMsg);
+			}
+			
+			//set status and percent
+			if (status == null || percent == null)
+				return;
+
+			self.statusmsg("Status:" + status);
+			self.percentmsg("Percent:" + percent);
+		}
+		
+        self.init = function(agentid, cmdresp, platform, name, profile) {
+			self.id = agentid;
+			self.output('');
+			//id = agentid;
+			self.dropdownVisible(cmdresp);
+			self.dropdownOptions.removeAll();
+			self.hash = '';
+			self.getDetails();
+			self.selectedopts.removeAll();
+			self.hostmsg("Name: " + name);
+			self.profilemsg("Profile: " + profile);
+			self.statusmsg('');
+			self.percentmsg('');
+			self.loading(false);
+			self.inited = true;
+			self.profileOptions.removeAll();
+			if (self.dropdownVisible())
+				self.profilesSelected();
+			self.historyurl('/WebApp/Log?agefilter=.1&agentid='+agentid);
+			self.platform(platform);
+			self.preview2(false);
+			$('#preview').attr('src','');
+			self.previewlabel('');
+			clearInterval(self.imginterval);
+		}
+		
+		self.profilesSelected = function() {
+			self.loading(true);
+			var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"listprofiles"});
+            result.done(function(dat) {
+				self.inited = false;
+            });
+		}
+
+		self.listSelected = function() {
+			//alert(id);
+			self.loading(true);
+			var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"go0"});
+		}
+
+		self.stopAll = function() {
+			var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"stop1"});
+		}
+		self.getLog = function() {
+			var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"uploadLog"});
+		}
+		
+		self.scanSelected = function() {
+			self.scanSelectedOpts("1");
+		}
+		
+		self.scanSelectedOpts = function(doScan) {
+			var selectText = "";
+			self.selectedopts().forEach(function (s) {
+				selectText += "," + s.Index;
+			});
+			
+			if (selectText.length  < 1)
+				alert('Make a selection.');
+			else {
+				self.loading(true);
+				var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"selectOne -1" + selectText + " " + doScan});
+			}
+		}
+		
+        self.toggleDetails = function() {
+			self.dropdownVisible(!self.dropdownVisible());
+		}
+		
+        self.getDetails = function() {
+            if (self.inprogress) return;
+			self.inprogress = true;
+			$.getJSON('/WebApp/api/products/'+self.id).done(function(data) {
+				var realoutput = data.Output;
+				if (!realoutput)
+					realoutput = data.output;
+				if (realoutput == null)
+				{
+					//alert('null')
+					self.inprogress = false;
+					return;
+				}
+				var lines = atob(realoutput).split('\n');
+				var urls = parseInt(lines[2]) + 3;
+				var endCount = lines.length - urls;
+				var pics = lines.slice(urls);
+				lines = lines.slice(lines.length - endCount/2);
+				self.dropdownOptions.removeAll();
+				for (i = 0; i < lines.length; ++i)
+				{
+					lines[i] = lines[i].substring(lines[i].indexOf(':')+1);
+					self.dropdownOptions.push({Index:i, Text:lines[i],Value:pics[i].substring(1)});
+				}
+				if (lines.length < 2)
+					$('#selectscan').attr('size',1);
+				else if (lines.length < 5)
+					$('#selectscan').attr('size',5);
+				else
+					$('#selectscan').attr('size',15);
+				lines = lines.join('<br/>');
+				self.output(lines);
+				self.inprogress = false;
+			})
+			.error(function(data) {self.inprogress = false;}
+			)
+			;
+		}
+	}
+	
+    function TaskConfigViewModel() {
+        var self = this;
+        self.debug = ko.observable(false);
+        self.moreoptions = ko.observable(false);
+		self.agentVersion = ko.observable('');
+        self.showadvanced = ko.observable(false);
+		
+        self.command = ko.observable();
+        self.commandTextbox = ko.observable();
+        self.response = ko.observable();
+        self.range = ko.observable();
+        self.range2 = ko.observable('65-80');
+        self.enabled = ko.observable();
+        self.enabled2 = ko.observable(true);
+        self.id = -1;
+        self.copiedConfig = '';
+        self.inited = ko.observable(false);
+        self.errorMsg = ko.observable();
+        self.offset = ko.observable('');
+        self.password = ko.observable('');
+
+        self.loading = ko.observable(true);
+        self.hostname = ko.observable();
+        self.mainserver = ko.observable();
+        self.hostdesc = ko.observable();
+		self.newdesc = ko.observable();
+		self.newdescvisible = ko.observable(false);
+		
+		self.backColor = ko.observable('black');
+		self.newhost = ko.observable();
+		self.newhostvisible = ko.observable(false);
+        self.interval = ko.observable("Interval:");
+        self.showRange = ko.observable(false);
+        self.refreshRate = ko.observable(2);
+        self.dropdownValue = ko.observable(0);
+        self.dropdownValue2 = ko.observable(0);
+		self.debugdropdownValue = ko.observable('');
+		
+        self.profile = "";
+        self.publickey = "";
+		self.agentstring = "";
+		
+        self.init = function(task) {
+            self.loading(true);
+            self.inited(false);
+            self.range('Range: ');
+            self.range2('');
+            self.enabled('Enabled: ');
+            self.errorMsg('');
+            self.enabled2(false);
+            self.interval("Polling Interval:");
+            self.showRange(false);
+            self.profile = task.Profile();
+            self.refreshRate(10);
+			self.newhostvisible(false);
+			self.newdescvisible(false);
+			self.moreoptions(false);
+			self.agentVersion(task.Version());
+			//alert(self.agentVersion());
+			self.showadvanced(false);
+            self.id = task.ID();
+            self.hostname('Host: ' + task.Name());
+            self.hostdesc('Desc: ' + task.Desc());
+			self.mainserver('');
+			self.publickey = "";
+			self.agentstring = "";
+			self.backColor('black');
+
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"getProperties"});
+            result.done(function(dat) {
+                if (!dat.command)
+                    self.command(dat.Command);
+                else
+                    self.command(dat.command);
+                }
+            );
+        }
+
+        self.pressedShow = function() {
+			self.showadvanced(true);
+		}
+        self.showVisible = function() {
+			return !self.showadvanced();
+		}
+		
+        self.pressedMore = function() {
+			self.moreoptions(true);
+		}
+        self.moreVisible = function() {
+			return !self.moreoptions() && self.agentVersion().slice(-1) != 'b';
+		}
+		
+        self.pressedGo = function() {
+            if (self.dropdownValue2() == 1) self.pushProfile();
+            else if (self.dropdownValue2() == 2) self.download();
+            else if (self.dropdownValue2() == 3) self.deploy();
+            else if (self.dropdownValue2() == 4) self.queryversion();
+            else if (self.dropdownValue2() == 5) self.pushSite();
+        }
+
+        self.query1 = function() {self.query('alertConfig');}
+        self.query2 = function() {self.query('alertQuery');}
+        self.pushProfile = function() {self.query('downloadProfile ' + self.profile);}
+        self.queryversion = function() {self.query('newVersion');}
+        self.pushSite = function() {self.query('deploySite');}
+        self.sendCmd = function() {self.query(self.commandTextbox());}
+        self.rename = function() {
+			if (self.hostname().length > 6)
+				self.newhost(self.hostname().substring(6));
+			self.hostname(self.hostname().substring(0, 5));
+			self.newhostvisible(true);
+		}
+        self.rename2 = function() {
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"name":self.newhost()});
+            result.done(function(dat) {
+				self.hostname(self.hostname() + " " + self.newhost());
+				self.newhostvisible(false);
+            })
+			;
+		}
+		self.renamedesc = function() {
+			if (self.hostdesc().length > 6)
+				self.newdesc(self.hostdesc().substring(6));
+			self.hostdesc(self.hostdesc().substring(0, 5));
+			self.newdescvisible(true);
+		}
+        self.renamedesc2 = function() {
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"desc":self.newdesc()});
+            result.done(function(dat) {
+				self.hostdesc(self.hostdesc() + " " + self.newdesc());
+				self.newdescvisible(false);
+            })
+			;
+		}
+		self.agentinfo = function() {
+			alert(self.agentstring);
+		}
+		self.debugdropdownChanged = function() {
+			self.commandTextbox(self.debugdropdownValue());
+		}
+		
+        self.query = function(cmd) {
+            self.loading(true);
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":cmd});
+            result.done(function(dat) {
+                if (!dat.command)
+                    self.command(dat.Command);
+                else
+                    self.command(dat.command);
+            });
+        }
+        self.copyConfig = function() {
+            var copied = self.response();
+            var index  = copied.indexOf('<br/>');
+            if (index == -1)
+            {
+                alert('Query Email Config before copying');
+                return;
+            }
+            alert('copied');
+            self.copiedConfig = copied.substring(index + 5);
+        }
+        self.sendConfig = function() {
+            if (self.copiedConfig.length < 1)
+            {
+                alert('Copy Config before sending');
+                return;
+            }
+            alert(self.copiedConfig);
+            self.query('emailConfig ' + self.copiedConfig);
+        }
+
+        self.getKey = function() {
+			self.query('keyQuery');
+		}
+		
+        self.testAlert = function() {
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"alertTest"});
+            result.done(function(dat) {
+                if (!dat.command)
+                    self.command(dat.Command);
+                else
+                    self.command(dat.command);
+            });
+        }
+		self.savePassword = function() {
+			if (self.password() == "")
+			{
+				alert('Enter password.');
+				return;
+			}
+			
+			var hiddenpassword = encryptWithPublicKey(self.password());
+			if (hiddenpassword != "" && self.password() != "")
+			{
+				self.query("saveAlertPassword " + hiddenpassword);
+			}
+		}
+        self.saveOffset = function() {
+			if (self.offset() == "")
+			{
+				alert('Enter offset.');
+				return;
+			}
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"alertDataConfig " + self.offset()});
+            result.done(function(dat) {
+                if (!dat.command)
+                    self.command(dat.Command);
+                else
+                    self.command(dat.command);
+            });
+        }
+        self.download = function() {
+            self.loading(true);
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"getUpdate"});
+            result.done(function(dat) {
+                if (!dat.command)
+                    self.command(dat.Command);
+                else
+                    self.command(dat.command);
+            });
+        }
+        self.deploy = function() {
+            self.loading(true);
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"genPoller"});
+            result.done(function(dat) {
+                if (!dat.command)
+                    self.command(dat.Command);
+                else
+                    self.command(dat.command);
+            });
+        }
+
+        self.dropdownGo = function() {
+            if (self.dropdownValue() == 1)
+                self.query2();
+            else if (self.dropdownValue() == 2)
+                self.query1();
+            else if (self.dropdownValue() == 3)
+                self.copyConfig();
+            else if (self.dropdownValue() == 4)
+                self.sendConfig();
+            else if (self.dropdownValue() == 5)
+                self.testAlert();
+            else if (self.dropdownValue() == 6)
+                self.getKey();
+        }
+
+        self.save = function() {
+            self.loading(true);
+            var zoo = self.enabled2() == true ? '1' : '0';
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', 
+            {"command":"setTwoProperties alertrange " + self.range2() + " alertenabled " + zoo });
+            result.done(function(dat) {
+                if (!dat.command)
+                    self.command(dat.Command);
+                else
+                    self.command(dat.command);
+            });
+        }
+        self.setPollingInterval = function() {
+            self.loading(true);
+            var result = ajax('/WebApp/api/products/' + self.id, 'PUT', {"command":"setProperty pollinginterval " + self.refreshRate()});
+            result.done(function(dat) {
+                if (!dat.command)
+                    self.command(dat.Command);
+                else
+                    self.command(dat.command);
+            });
+        }
+
+        self.update = function(id, response) {
+			if (response == null)
+				return;
+
+            if (self.id != id)
+                return;
+
+            self.response(response);
+
+            var index = self.command().indexOf(':');
+            if (index == -1) return;
+            var cmdNum = self.command().substring(0, index);
+            var cmdNam = self.command().substring(index + 1);
+            
+            index = self.response().indexOf('.');
+            if (index == -1) 
+                index = self.response().indexOf(':');
+            else 
+            {
+                var index2 = self.response().indexOf(':');
+                if (index2 != -1 && index2 < index)
+                    index = index2;
+            }
+            if (index == -1) return;
+            var rspNum = self.response().substring(0, index);
+            var rspMsg = self.response().substring(index + 1);
+            
+            if (cmdNum != rspNum)
+			{
+				self.loading(true);
+                return;
+			}
+
+            if (cmdNam.indexOf('setTwoProperties') != -1)
+            {
+                if (rspMsg.length < 1)
+                {
+                    self.errorMsg('Saved ');
+                    //$('#config').modal('hide');
+                }
+                else
+                    self.errorMsg('Error: ' + rspMsg);
+				self.loading(false);
+                return;
+            }
+
+            if (cmdNam.indexOf('alertQuery') != -1)
+            {
+				if (!self.loading()) return;
+                rspMsg = rspMsg.replace('never', '<br/>never');
+                rspMsg = rspMsg.replace('attempt=', '<br/>attempt=');
+                rspMsg = rspMsg.replace('sent=', '<br/>sent=');
+                rspMsg = rspMsg.replace('average=', '<br/>average=');
+                rspMsg = rspMsg.replace('nextavg=', '<br/>nextavg=');
+                self.errorMsg('Query: ' + rspMsg);
+				//alert('scrolly');
+				ScrollTo('responseLabel');
+				self.loading(false);
+                return;
+            }
+
+            if (cmdNam.indexOf('keyQuery') != -1)
+			{
+				if (!self.loading()) return;
+                self.errorMsg('Query: <br/>' + rspMsg);
+				ScrollTo('responseLabel');
+				self.loading(false);
+				self.publickey = rspMsg;
+                return;
+			}
+			
+            if (cmdNam.indexOf('saveAlertPassword') != -1 || cmdNam.indexOf('alertConfig') != -1 || cmdNam.indexOf('newVersion') != -1 || cmdNam.indexOf('deploySite') != -1)
+            {
+				if (!self.loading()) return;
+                self.errorMsg('Query: ' + rspMsg);
+				ScrollTo('responseLabel');
+				self.loading(false);
+                return;
+            }
+
+            self.loading(false);
+            if (cmdNam.indexOf('alertDataConfig') != -1)
+            {
+                self.errorMsg('Offset: ' + rspMsg);
+                return;
+            }
+
+            if (cmdNam.indexOf('alertTest') != -1)
+            {
+                self.errorMsg('Test: ' + rspMsg);
+                return;
+            }
+
+            if (cmdNam.indexOf('getUpdate') != -1 || cmdNam.indexOf('downloadProfile') != -1)
+            {
+                self.errorMsg('Push: ' + rspMsg);
+                return;
+            }
+
+            if (cmdNam.indexOf('genPoller') != -1)
+            {
+                self.errorMsg('Deploy: ' + rspMsg);
+                return;
+            }
+
+            if (cmdNam.indexOf('setProperty pollinginterval ') != -1)
+            {
+                if (rspMsg.length > 0)
+                    return;
+                var interval = cmdNam.substring(28);
+                self.interval("Polling Interval: " + interval);
+                return;
+            }
+
+            //returned properties
+            index = self.response().indexOf('pollinginterval=');
+            if (index != -1) 
+            {
+                var interval = self.response().substring(index + 16);
+                index = interval.indexOf(' ');
+                if (index != -1) 
+                {
+                    interval = interval.substring(0, index);
+                }
+                self.interval("Polling Interval: " + interval);
+                if (!self.inited())
+                    self.refreshRate(interval);
+            }
+
+			index = self.response().indexOf('mainserver=');
+            if (index != -1) 
+            {
+                var mainserver = self.response().substring(index + 11);
+                index = mainserver.indexOf(' ');
+                if (index != -1) 
+                {
+                    mainserver = mainserver.substring(0, index);
+                }
+				self.mainserver(mainserver + '/WebApp');
+                if (!self.inited())
+					alert("Echo of " + mainserver);
+			}
+
+			index = self.response().indexOf('testmode=1');
+            if (index != -1) 
+            {
+                if (!self.inited()) {
+					self.backColor('red');
+					alert("Test mode");
+				}
+			}
+
+			index = self.response().indexOf('uptime=');
+            if (index != -1) 
+            {
+				index2 = self.response().indexOf(' ', index);
+				if (!self.inited()) {
+					self.agentstring += "\nUptime: " + (index2 != -1 ?
+						self.response().substring(index + 7, index2) : self.response().substring(index + 7));
+						//alert(index2);
+				}
+			}	
+			
+			index = self.response().indexOf('sensor=');
+            if (index != -1) 
+            {
+				if (!self.inited())
+					self.agentstring += "\nSensor: " + self.response().substring(index + 7);
+			}	
+			
+            index = self.response().indexOf('alertrange=');
+            if (index == -1) 
+            {
+                if (self.inited())
+                    return;
+                self.inited(true);
+                self.showRange(false);
+                return;
+            }
+            self.showRange(true);
+            var range = self.response().substring(index + 11);
+            index = range.indexOf(' ');
+            if (index != -1) 
+				range = range.substring(0, index);
+            //self.range('Range: ' + range);
+
+            index = self.response().indexOf('alertenabled=');
+            if (index == -1) return;
+            var enabled = self.response().substring(index + 13);
+            index = enabled.indexOf(' ');
+            if (index != -1)
+				enabled = enabled.substring(0, index);
+            //self.enabled('Enabled: ' + enabled);
+            
+            if (self.inited())
+                return;
+            self.inited(true);
+            self.enabled2(enabled == "1");
+            self.range2(range);
+        }
+    }
+
+    var ajax = function(uri, method, data) {
+        var request = {
+            url: uri,
+            type: method,
+            contentType: "application/json",
+            //cache: false,
+            dataType: 'json',
+            data: JSON.stringify(data),
+            error: function(jqXHR, text) {
+                console.log("ajax error " + jqXHR.status);
+                alert('err ' + jqXHR.status + ': ' + text);
+            }
+        };
+        return $.ajax(request);
+    }
+
+
+    function TitleBarViewModel(tvm) {
+        var self = this;
+        self.refreshRate = ko.observable(1);
+        self.username = ko.observable('');
+		self.jobalert = ko.observable('');
+		self.jobalertlink = ko.observable('');
+		self.intervalId = 0;
+		
+        self.mainModel = tvm;
+
+        self.adjustSlider = function(task) {
+            self.mainModel.setPoller(self.refreshRate());
+        }
+		
+		self.showAlert = function() {
+			alert(self.jobalert());
+		}
+		
+        self.refreshJobAlert = function() {
+			$.getJSON('/WebApp/api/products/0')
+			.done(function(data) {
+				var profile = data.profile;
+				if (profile == null)
+					profile = data.Profile;
+				if (profile != null) {
+					self.jobalert(profile);
+					self.jobalertlink(profile.length > 0 ? '!!!!' : '');
+				}
+			})
+			.error(function(data) {
+				clearInterval(self.intervalId);
+			}
+			);
+        }
+		
+		self.intervalId = setInterval(self.refreshJobAlert, 60 * 1000);
+				
+        $.getJSON('/WebApp/api/products/0').done(function(data) {
+			var name = data.name;
+			if (name == null) {
+				name = data.Name;
+				self.mainModel.platform(true);
+			}
+			var status = data.status;
+			if (status == null)
+				status = data.Status;
+
+			var os = data.os;
+			if (os == null)
+				os = data.OS;
+			var ver = data.version;
+			if (ver == null)
+				ver = data.Version;
+			var per = data.percent;
+			if (per == null)
+				per = data.Percent;
+			
+			var age = data.age;
+			if (age == null)
+				age = data.Age;
+				
+			var ip = data.ip;
+			if (ip == null)
+				ip = data.IP;
+			
+var profile = data.profile;
+if (profile == null)
+	profile = data.Profile;
+if (profile != null && profile.length > 0) {
+	alert('Job alert!\n\n'+profile);
+	self.jobalert(profile);
+	self.jobalertlink('!!!!');
+}
+	
+			self.username('(user='+name+')');
+			var isadmin = status == 'True';
+			self.mainModel.isadmin(isadmin);
+			self.mainModel.serveros(os);
+			self.mainModel.serverid(ver);
+			self.mainModel.servergb(per);
+			self.mainModel.servergb2(age);
+			self.mainModel.serverip(ip);
+			//alert(age);
+		});
+    }
+
+	function ScrollTo(id){
+
+		// Scroll
+		$('#configbody').animate(
+			{scrollTop: $("#"+id).offset().top}, 'slow'
+		);
+	}
+	
+	function contains(selection, id) {
+		var retval = false;
+		selection.forEach(function (s) {
+			if (id == s)
+				retval = true;
+		});
+		return retval;
+	}
+	
+    function TasksViewModel(tcvm, tdvm, tuvm, tevm) {
+        var self = this;
+        self.popup = tcvm;
+        self.popup2 = tdvm;
+        self.popup3 = tuvm;
+        self.popup4 = tevm;
+        self.tasksURI = '/WebApp/api/products';
+        self.tasks = ko.observableArray();
+	    self.taskCount = ko.observable(0);
+		self.globTime = ko.observable('');
+	    self.platform = ko.observable(false);
+        self.activeOnly = ko.observable(true);
+        self.unusedOnly = ko.observable(false);
+		
+        self.verbose = ko.observable(false);
+		self.cmdresp = ko.observable(false);
+		self.commandAllTextbox = ko.observable('test');
+		self.commanddropdownValue = ko.observable(0);
+        self.sortByHost = ko.observable(false);
+	    self.filter = ko.observable('');
+	    self.descfilter = ko.observable('');
+        self.pollId = null;
+		self.isadmin = ko.observable(false);
+		self.serveros = ko.observable('');
+		self.serverid = ko.observable('');
+		self.servergb = ko.observable('');
+		self.servergb2 = ko.observable('');
+		self.serverip = ko.observable('');
+
+		self.dropdownChanged = function() {
+			//if (self.commanddropdownValue() == "")
+			//	return;
+				
+			self.commandAllTextbox(self.commanddropdownValue());
+		}
+		
+		self.showVerboseAdminColumn = function() {
+			return self.isadmin() && self.verbose();
+		}
+		
+		self.showVerboseAdminColumnWindows = function() {
+			return self.isadmin() && self.verbose() && self.platform();
+		}
+		
+		self.pressedInvert = function() {
+			if (self.filter().substring(0,1) == "!")
+				self.filter(self.filter().substring(1));
+			else
+				self.filter("!" + self.filter());
+		}
+		self.pressedClear = function() {self.filter('');}
+		self.pressedName = function() {
+            self.sortByHost(!self.sortByHost());
+		}
+		
+		self.pressedDesc = function(task) {
+			if (self.descfilter() == task.Desc())
+				self.descfilter('');
+			else
+				self.descfilter(task.Desc());
+		}
+		self.pressedProfile = function(task) {
+			if (self.filter() != '') {
+				if (self.filter().indexOf(task.Profile()) == -1)
+					self.filter(self.filter()+'|'+task.Profile());
+			}
+			else
+				self.filter(task.Profile());
+		}
+		self.showResponse = function(task) {
+			alert(task.Response());
+		}
+        self.openDetailsDialog = function(task) {
+			self.popup2.init(task.ID(), self.cmdresp(), self.platform(), task.Name(), task.Profile());
+            $('#details').modal('show');
+        }
+
+        self.setPoller = function(rate) {
+            clearInterval(self.pollId);
+            self.pollId = setInterval(self.load, rate * 1000);
+        }
+
+        self.sendCommand = function() {
+			var foundSelection = false;
+			self.tasks().forEach(function (t) {
+				if (t.Selected()) {
+					foundSelection = true;
+					var result = ajax('/WebApp/api/products/' + t.ID(), 'PUT', {"command":self.commandAllTextbox()});
+				}
+			});
+			if (!foundSelection)
+				alert('Make a selection.');
+		}
+
+        self.addAgent = function(task) {
+			var data = { "Name": "newagent", "IP": "", "Version": "", "OS": "", "Status":"", "Profile":"" };
+			
+			var request = {
+				url: '/WebApp/api/products',
+				type: 'POST',
+				data: "Name=newagent",
+				error: function(jqXHR, text) {
+					alert('err ' + jqXHR.status + ': ' + text);
+				}
+			};
+			
+			if (self.platform())
+				var result = ajax('/WebApp/api/products', 'POST', data);
+			else
+				var result = $.ajax(request);
+		}
+
+        self.deleteAgent = function(task) {
+            if (!confirm('Are you sure?'))
+				return;
+			
+			var result = ajax('/WebApp/api/products/' + task.ID(), 'DELETE', null);
+			result.done(function(dat) {
+				alert('deleted ' + task.ID());
+		   });
+ 		}
+        
+        self.openEmailDialog = function() {
+            self.popup4.init(self.popup.copiedConfig, self);
+            $('#emailconfig').modal('show');
+        }
+        3
+		self.openServerDialog = function() {
+			alert('OS:        '+self.serveros()+'\nVersion: '+self.serverid() + '\nSpace:    ' + 
+				self.servergb() + ' MB / ' + self.servergb2() + ' MB\nBackup: ' + 
+				(self.serverip() == "" ? "None" : self.serverip()));
+		}
+		
+        self.openUserDialog = function(task) {
+            self.popup3.init(task.ID());
+            $('#usersconfig').modal('show');
+        }
+		
+        self.openDialog = function(task) {
+            self.popup.init(task);
+            $('#config').modal('show');
+        }
+        
+        self.remainingResp = function(resp) {
+			if (resp.length < 20)
+				return '';
+			return '...';
+		}
+		
+		self.setResponseColor = function(data) {
+			if (data.Command == null || data.Response == null)
+				return 'black';
+			
+			var cmd = data.Command;
+			
+			var index = cmd.indexOf(':');
+            if (index == -1) 
+				return 'black';
+            var cmdNum = cmd.substring(0, index);
+			
+			var resp = data.Response;
+			var respError = false;
+			index = resp.indexOf('.');
+            if (index == -1)
+			{
+                index = resp.indexOf(':');
+				respError = true;
+			}
+            else 
+            {
+                var index2 = resp.indexOf(':');
+                if (index2 != -1 && index2 < index)
+                    index = index2;
+            }
+            if (index == -1) 
+				return 'black';
+            var rspNum = resp.substring(0, index);
+			
+			if (rspNum != cmdNum)
+				return 'black';
+				
+			return respError ? 'red' : 'green';
+		}
+		
+		self.load = function() {
+
+            var yarg = "";
+            if (self.activeOnly())
+                yarg = "y";
+				
+            var sortarg = "false";
+            if (self.sortByHost())
+                sortarg = "true";
+				
+            var unusedarg = "n";
+            if (self.unusedOnly())
+                unusedarg = "y";
+				
+            $.getJSON(self.tasksURI + "?active=" + yarg+"&filter="+self.filter()+"&sbh="+sortarg+"&unused="+unusedarg).done(function(data) {
+                var selection = [];
+				self.tasks().forEach(function (t) {
+					if (t.Selected())
+						selection.push(t.ID());
+				});
+				
+				self.tasks.removeAll();
+                for (var i = 0; i < data.length; i++) {
+		            if (data[i].id == 0) {self.globTime(data[i].lastReport.substring(0,19)); continue}
+                    if (!data[i].name) 
+                    {
+						agentPath = "";
+						if (data[i].Version != "0.9.4a") 
+							agentPath = "/agent"+data[i].Id;
+						if (data[i].OS && data[i].OS.indexOf("Windows") != -1) {
+							agentPath = "/winagent";
+						}
+						//this is talking to a Windows REST API
+                        self.platform(true);
+                        if (self.descfilter().length > 0 && data[i].Desc != null && data[i].Desc.indexOf(self.descfilter()) == -1)
+							continue;
+							
+						self.tasks.push({
+                            ID: ko.observable(data[i].Id),
+                            Name: ko.observable(data[i].Name),
+                            Desc: ko.observable(data[i].Desc),
+                            IP: ko.observable(data[i].IP),
+                            IP2: ko.observable(data[i].IP2),
+                            IP2URL: ko.observable("//" + data[i].IP2),
+                            IP2URL2: ko.observable("//" + data[i].IP2 + agentPath + "/graph.html"),
+                            Version: ko.observable(data[i].Version),
+                            OS: ko.observable(data[i].OS),
+                            Output: ko.observable(data[i].Age),
+                            Profile: ko.observable(data[i].Profile),
+                            FirstLine: ko.observable(data[i].FirstLine),
+                            SecondLine: ko.observable(data[i].Output),
+                            Time: ko.observable(data[i].LastReport.substring(0,19)),
+                            Color: ko.observable(data[i].Age > 120 ? "red" : "green"),
+                            AlertColor: ko.observable(data[i].AlertCondition ? "red" : 
+								data[i].Output != null && data[i].Output.length > 0 ? "purple" : "black"),
+                            Command: ko.observable(data[i].Command),
+                            Response: ko.observable(data[i].Response),
+                            Response2: ko.observable(
+								data[i].Response != null ? data[i].Response.substring(0, 20) + self.remainingResp(data[i].Response) : ""
+								),
+							ResponseColor: self.setResponseColor(data[i]),
+                            Status: ko.observable(data[i].Status),
+                            Percent: ko.observable(data[i].Percent),
+                            Selected: ko.observable(contains(selection,data[i].Id)),
+							Details: ko.observable('/WebApp/logs/' + data[i].Id),
+                            ShowDetails: ko.observable(data[i].Status != null && data[i].Status.indexOf('FINISHED') != -1 ? true : false),
+                        });
+						
+						if ($('#config').css('display') != 'none') {
+							self.popup.update(data[i].Id, data[i].Response);
+						}
+                        
+						if ($('#details').css('display') != 'none') {
+							self.popup2.update(data[i].Id, data[i].Status, data[i].Percent, data[i].Command, data[i].Response, data[i].Profile, data[i].OutputHash);
+						}
+                        continue;
+                    }
+                    
+					if (self.descfilter().length > 0 && data[i].desc != null && data[i].desc.indexOf(self.descfilter()) == -1)
+						continue;
+							
+                    self.tasks.push({
+                        ID: ko.observable(data[i].id),
+                        Name: ko.observable(data[i].name),
+						Desc: ko.observable(data[i].desc),
+                        IP: ko.observable(data[i].ip),
+                        IP2: ko.observable(data[i].iP2),
+                        IP2URL: ko.observable("//" + data[i].iP2),
+                        IP2URL2: ko.observable("//" + data[i].iP2 + "/graph.html"),
+                        Version: ko.observable(data[i].version),
+                        OS: ko.observable(data[i].os),
+                        Output: ko.observable(data[i].age),
+                        Profile: ko.observable(data[i].profile),
+                        FirstLine: ko.observable(data[i].firstLine),
+						SecondLine: ko.observable(data[i].output),
+                        Time: ko.observable(data[i].lastReport.substring(0,19)),
+			            Color: ko.observable(data[i].age > 120 ? "red" : "green"),
+			            AlertColor: ko.observable(data[i].alertCondition ? "red" :
+								data[i].output != null && data[i].output.length > 0 ? "purple" : "black"),
+						
+						Command: ko.observable(data[i].command),
+						Response: ko.observable(data[i].response),
+						Response2: ko.observable(
+							data[i].response != null ? data[i].response.substring(0, 20) + self.remainingResp(data[i].response) : ""
+						),
+							ResponseColor: self.setResponseColor(data[i]),
+                            Status: ko.observable(""),
+						Percent: ko.observable(data[i].percent),
+						Selected: ko.observable(contains(selection,data[i].id)),
+						Details: ko.observable('/WebApp/logs/' + data[i].id),
+						ShowDetails: ko.observable(data[i].status != null && data[i].status.indexOf('FINISHED') != -1 ? true : false),
+                    });
+					
+					if ($('#config').css('display') != 'none') {
+						self.popup.update(data[i].id, data[i].response);
+					}
+					if ($('#details').css('display') != 'none') {
+						self.popup2.update(data[i].id, data[i].status, data[i].percent, data[i].command, data[i].response, data[i].profile, data[i].outputHash);
+					}
+                }
+				self.taskCount(self.tasks().length);
+            })
+            .error(function(jqXHR, text) {
+                alert("error: " + jqXHR.status);
+                clearInterval(self.pollId);
+                }
+            );
+        }
+        
+        self.pollId = setInterval(self.load,1000);
+    }
+    var tcvm = new TaskConfigViewModel();
+    var tdvm = new TaskDetailsViewModel();
+    var tuvm = new TaskUsersViewModel();
+    var tevm = new TaskEmailViewModel();
+    var tvm = new TasksViewModel(tcvm, tdvm, tuvm, tevm);
+    ko.applyBindings(tvm, $('#main')[0]);
+    ko.applyBindings(tcvm, $('#config')[0]);
+    ko.applyBindings(tdvm, $('#details')[0]);
+    ko.applyBindings(tuvm, $('#usersconfig')[0]);
+    ko.applyBindings(tevm, $('#emailconfig')[0]);
+	
+    ko.applyBindings(new TitleBarViewModel(tvm), $('#titlebar')[0]);
+	
+	//right-click menu
+	document.body.addEventListener('click', function() {
+	  document.getElementById("rightclicked").style.display = "none";
+	});
+	document.body.addEventListener('contextmenu', function() {
+	  document.getElementById("rightclicked").style.display = "none";
+	});
+	
+	var element = document.getElementById("selectscan");
+	if (element != null) {
+		element.addEventListener('contextmenu', function(ev) {
+		  ev.stopPropagation();
+		  ev.preventDefault();
+		  rightclick(ev);
+		  return false;
+		}, false);
+		//alert('loaded');
+	}
+	
+	function dothecopy() {tdvm.scanSelectedOpts("0");} 
+	function dothescan() {tdvm.scanSelected();} 
+	function dothestop() {tdvm.stopAll();}
+	function dothegetlog() {tdvm.getLog();}
+	function rightclick(ev) {
+	  var cantThinkOfAName = document.getElementById("rightclicked");
+	  if (cantThinkOfAName == null) alert('null');
+	  cantThinkOfAName.style.display = "block";
+	  cantThinkOfAName.style.left = ev.clientX + "px";
+	  cantThinkOfAName.style.top = ev.clientY + "px";
+	  //e.forEach(function (s) {alert(s);});
+	}
+	
+	function encryptWithPublicKey(source) {
+		if (tcvm.publickey == "") {
+			alert("no key - run Get Public Key");
+			return "";
+		}
+		
+		var publicKey = forge.pki.publicKeyFromPem(tcvm.publickey);
+		var encrypted = publicKey.encrypt(source, "RSA-OAEP", {
+            md: forge.md.sha256.create(),
+            mgf1: forge.mgf1.create()
+        });
+		var base64 = forge.util.encode64(encrypted);		
+		//var encrypt = new JSEncrypt();
+        //encrypt.setPublicKey(tcvm.publickey);
+        //var encrypted = encrypt.encrypt('test');
+		return base64;
+		//var rsa = new RSAKey();
+		//rsa.setPublic(base64toHEX(tcvm.publickey), '10001');
+		//var res = rsa.encrypt('test');
+		if(encrypted) {
+			//alert(res+'\n\ntest');
+			//alert(encrypted);
+			document.getElementById('encrypted').innerHTML = base64 + '<br/><br/>';
+		}
+	}
+    </script>
+</body>
+
+</html>

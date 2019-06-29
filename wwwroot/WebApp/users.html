@@ -1,0 +1,364 @@
+<html>
+
+<head>
+    <title>Users</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+    <script src="//ajax.aspnetcdn.com/ajax/jquery/jquery-1.9.0.js"></script>
+    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+    <script src="//ajax.aspnetcdn.com/ajax/knockout/knockout-2.2.1.js"></script>
+</head>
+
+<body>
+    <div id="titlebar" class="navbar">
+        <div class="navbar-inner">
+            <a style='display: inline-block;' class="brand" href="#">Agents Dashboard</a>
+			<label style='padding:8px; display: inline-block;' data-bind="text:username"></label>
+			<div style="float:right;">
+				Page Refresh Rate<br/>
+				<label style='display: inline-block;'>1</label>
+				<input style='display: inline-block;' id="slider" type="range" min="1" max="30" data-bind="value:refreshRate, click: adjustSlider"/>
+				<label style='display: inline-block;'>30</label>
+			</div>
+        </div>
+    </div>
+
+    <div id="main" class="container">
+		<div data-bind="visible:platform">
+		<input type="text" title="id filter" class='form-control' data-bind="value:idfilter,visible:isadmin" style="height:25px;width:100px;vertical-align:top;">
+		<button class="btn" data-bind="click:getUsers,visible:isadmin">Search Ids</button>
+		</div>
+		
+		<label style="float:right;">
+            &nbsp;user(s)&nbsp;&nbsp;&nbsp;&nbsp;
+        </label>
+        <label style="float:right;" data-bind="text:taskCount"></label>
+
+        <br/>
+        <br/>
+        <table class="table table-striped">
+            <tr>
+                <td><label style="color:blue;"><b></b></label></td>
+                <td><label style="color:blue;"><b>Name</b></label></td>
+                <td data-bind="visible:platform"><label style="color:black;"><b>Agent Ids</b></label></td>
+				<td data-bind="visible:platform"><label style="color:black;"><b>Data Usage</b></label></td>
+                <!--
+				-->
+                <td data-bind="visible:!platform()"><label style="color:black;"><b>Type</b></label></td>
+                <td data-bind="visible:platform"><label style="color:black;"><b>View All</b></label></td>
+                <td data-bind="visible:platform"><label style="color:black;"><b>Data History</b></label></td>
+                <td data-bind="visible:platform"><label style="color:black;"><b>Upload</b></label></td>
+                <td data-bind="visible:platform"><label style="color:black;"><b>Upload History</b></label></td>
+            </tr>
+            <!-- ko foreach: tasks -->
+            <tr>
+                <td>
+                    <label style='color:blue;' data-bind="click: $parent.deleteAgent,visible:$parent.isadmin">X</label>
+                </td>
+                <td>
+                    <a target="blank" data-bind="text:Name"></a>
+                </td>
+                <td data-bind="visible:$parent.platform">
+                    <a target="blank" data-bind="text:FixedIds"></a>
+                </td>
+                <td>
+                    <a target="blank" data-bind="text:Info"></a>
+                </td>
+                <td data-bind="visible:$parent.platform">
+                    <label style='color:black;' data-bind="text:ViewAll"></label>
+                    <label style='color:blue;' data-bind="click: $parent.toggleAgent1,visible:$parent.isadmin">Toggle</label>
+                </td>
+                <td data-bind="visible:$parent.platform">
+                    <label style='color:black;' data-bind="text:DataLog"></label>
+                    <label style='color:blue;' data-bind="click: $parent.toggleAgent4,visible:$parent.isadmin">Toggle</label>
+                </td>
+                <td data-bind="visible:$parent.platform">
+                    <label style='color:black;' data-bind="text:Upload"></label>
+                    <label style='color:blue;' data-bind="click: $parent.toggleAgent2,visible:$parent.isadmin">Toggle</label>
+                </td>
+                <td data-bind="visible:$parent.platform">
+                    <label style='color:black;' data-bind="text:UploadHistory"></label>
+                    <label style='color:blue;' data-bind="click: $parent.toggleAgent3,visible:UploadHistoryShowToggle">Toggle</label>
+                </td>
+            </tr>
+            <!-- /ko -->
+        </table>
+
+		<input type="text" title="user name" class='form-control' data-bind="value:newusername,visible:isadmin" style="height:25px;width:100px;vertical-align:top;">
+		<button class="btn" data-bind="click:addUser,visible:isadmin">Add User</button>
+		
+		<hr>
+		<br/>
+		Old Password&nbsp;&nbsp;<input type="password" title="old password" class='form-control' data-bind="value:oldpass" style="height:25px;width:100px;vertical-align:top;"><br/>
+		New Password&nbsp;<input type="password" title="new password" class='form-control' data-bind="value:newpass1" style="height:25px;width:100px;vertical-align:top;"><br/>
+		New Password&nbsp;<input type="password" title="confirm new password" class='form-control' data-bind="value:newpass2" style="height:25px;width:100px;vertical-align:top;"><br/>
+		<button class="btn" data-bind="click:modifyPass">Change Password</button>
+    </div>
+
+    <script type="text/javascript">
+
+    var ajax = function(uri, method, data) {
+        var request = {
+            url: uri,
+            type: method,
+            contentType: "application/json",
+            //cache: false,
+            dataType: 'json',
+            data: JSON.stringify(data),
+            error: function(jqXHR, text) {
+                console.log("ajax error " + jqXHR.status);
+                alert('err ' + jqXHR.status + ': ' + text);
+            }
+        };
+        return $.ajax(request);
+    }
+
+    function TitleBarViewModel(tvm) {
+        var self = this;
+        self.refreshRate = ko.observable(1);
+        self.username = ko.observable('');
+        self.mainModel = tvm;
+		
+        self.adjustSlider = function(task) {
+            self.mainModel.setPoller(self.refreshRate());
+        }
+		
+        $.getJSON('/WebApp/api/products/0').done(function(data) {
+			var platform = false;
+			
+			var name = data.name;
+			if (name == null) {
+				name = data.Name;
+				platform = true;
+			}
+				
+			var status = data.status;
+			if (status == null)
+				status = data.Status;
+				
+			self.username('(user='+name+')');
+			var isadmin = status == 'True';
+			self.mainModel.isadmin(isadmin);
+			self.mainModel.platform(platform);
+			//alert(isadmin);
+		});
+    }
+
+	function fixids(ids) {
+        var ids2 = [];
+		ids.split(',').forEach(function(id){ if (id[0] != '-') ids2.push(id); });
+		return ids2;
+	}
+	
+	function contains(selection, id) {
+		var retval = false;
+		selection.forEach(function (s) {
+			if (id == s)
+				retval = true;
+		});
+		return retval;
+	}
+	
+    function TasksViewModel() {
+        var self = this;
+        self.tasksURI = '/WebApp/api/users';
+        self.tasks = ko.observableArray();
+	    self.taskCount = ko.observable(0);
+	    self.platform = ko.observable(false);
+        self.verbose = ko.observable(false);
+        self.sortByHost = ko.observable(false);
+	    self.filter = ko.observable('');
+        self.pollId = null;
+		self.isadmin = ko.observable(false);
+        self.newusername = ko.observable('');
+        
+		self.oldpass = ko.observable('');
+		self.newpass1 = ko.observable('');
+		self.newpass2 = ko.observable('');
+
+		self.idfilter = ko.observable('');
+		
+		self.pressedInvert = function() {
+			if (self.filter().substring(0,1) == "!")
+				self.filter(self.filter().substring(1));
+			else
+				self.filter("!" + self.filter());
+		}
+		self.pressedClear = function() {self.filter('');}
+        self.setPoller = function(rate) {
+            clearInterval(self.pollId);
+            self.pollId = setInterval(self.load, rate * 1000);
+        }
+        self.addUser = function(task) {
+			if (self.newusername().length < 1)
+			{
+				alert('Enter user name');
+				return;
+			}
+
+			//if (!self.platform())
+			{
+				if (self.newpass1().length < 1 || self.newpass2().length < 1) {
+					alert('Missing new password(s)');
+					return;
+				}
+				if (self.newpass1() != self.newpass2()) {
+					alert('new password mismatch');
+					return;
+				}
+			}
+			
+			var data = { "Name": self.newusername(), "Ids": self.newpass1() };
+			var request = {
+				url: '/WebApp/api/users',
+				type: 'POST',
+				data: "Name="+self.newusername()+"&Info="+self.newpass1(),
+				error: function(jqXHR, text) {
+					alert('err ' + jqXHR.status + ': ' + text);
+				}
+			};
+        
+			if (self.platform())
+				var result = ajax('/WebApp/api/users/', 'POST', data);
+			else
+				var result = $.ajax(request);
+			
+			result.done(function(dat) {
+				self.load();
+		   });
+		}
+		self.getUsers = function() {self.load();}
+		
+        self.modifyPass = function() {
+			if (self.oldpass().length < 1 || self.newpass1().length < 1 || self.newpass2().length < 1) {
+				alert('Missing password(s)');
+				return;
+			}
+			if (self.newpass1() != self.newpass2()) {
+				alert('new password mismatch');
+				return;
+			}
+			
+			ajax('/WebApp/api/users/2', "PUT", { "Name": self.oldpass(), "Ids": self.newpass1() }).done(function (data) {
+                if (data == 0) 
+				{
+					alert("Success");
+					self.load();
+				}
+				else
+				{
+					if (data == -2)
+						alert("Bad password: cannot contain quote character.");
+					else if (data == -1)
+						alert("Bad password.");
+					else 
+						alert(data);
+				}
+            });
+		}
+
+        self.deleteAgent = function(task) {
+            if (!confirm('Are you sure?'))
+				return;
+			
+			var data = { "Name": task.Name() };
+			var result = ajax('/WebApp/api/users/' + task.ID(), 'DELETE', data);
+			
+			result.done(function(dat) {
+				alert('deleted user');
+				self.load();
+		   });
+ 		}
+
+        self.toggleAgent1 = function(task) {self.toggleAgent(task, "-2", task.ViewAll());}
+        self.toggleAgent2 = function(task) {self.toggleAgent(task, "-3", task.Upload());}
+        self.toggleAgent3 = function(task) {self.toggleAgent(task, self.isadmin() ? "-4" : "-5", task.UploadHistory());}
+        self.toggleAgent4 = function(task) {self.toggleAgent(task, "-6", task.DataLog());}
+        self.toggleAgent = function(task, id, val) {
+            var userid = '0';
+			if (val == 'Yes')
+				userid = '1';
+			ajax('/WebApp/api/users/'+userid, "PUT", { "Name": task.Name(), "Ids": id }).done(function (data) {
+                self.load();
+            });
+		}
+		
+		self.load = function() {
+
+            var sortarg = "false";
+            if (self.sortByHost())
+                sortarg = "true";
+            $.getJSON(self.tasksURI + "?filter="+self.filter()+"&sbh="+sortarg).done(function(data) {
+                var selection = [];
+				self.tasks().forEach(function (t) {
+					if (t.Selected())
+						selection.push(t.ID());
+				});
+				
+				self.tasks.removeAll();
+                for (var i = 0; i < data.length; i++) {
+                    if (self.idfilter() != "" && data[i].Ids.indexOf(self.idfilter()) == -1)
+						continue;
+					
+					if (data[i].name) {
+						self.tasks.push({
+							ID: ko.observable(self.tasks().length),
+							Ids: ko.observable(data[i].ids),
+							FixedIds: ko.observable(fixids(data[i].ids)),
+							Name: ko.observable(data[i].name),
+							Info: ko.observable(data[i].info),
+							Selected: ko.observable(false),
+							ViewAll: ko.observable(contains(data[i].ids.split(','),'-2') ? 'Yes' : 'No'),
+							DataLog: ko.observable(contains(data[i].ids.split(','),'-6') ? 'Yes' : 'No'),
+							Upload: ko.observable(contains(data[i].ids.split(','),'-3') ? 'Yes' : 'No'),
+							UploadHistoryShowToggle: ko.observable(self.isadmin() || contains(data[i].ids.split(','),'-4')),
+							UploadHistory: ko.observable('No')
+						});
+						//alert(data[i].name);
+						continue;
+					}
+					
+					//TODO: split ids here
+					self.tasks.push({
+                        ID: ko.observable(self.tasks().length),
+                        Ids: ko.observable(data[i].Ids),
+                        FixedIds: ko.observable(fixids(data[i].Ids)),
+                        Name: ko.observable(data[i].Name),
+                        Info: ko.observable(data[i].Info),
+						Selected: ko.observable(false),
+						ViewAll: ko.observable(contains(data[i].Ids.split(','),'-2') ? 'Yes' : 'No'),
+						DataLog: ko.observable(contains(data[i].Ids.split(','),'-6') ? 'Yes' : 'No'),
+						Upload: ko.observable(contains(data[i].Ids.split(','),'-3') ? 'Yes' : 'No'),
+						UploadHistoryShowToggle: ko.observable(self.isadmin() || contains(data[i].Ids.split(','),'-4')),
+						UploadHistory: ko.observable(
+							self.isadmin() ? 
+							contains(data[i].Ids.split(','),'-4') ? 'Yes' : 'No'
+							:
+							contains(data[i].Ids.split(','),'-4') && contains(data[i].Ids.split(','),'-5') ? 'Yes' : 'No'
+							),
+                    });
+                }
+				self.taskCount(self.tasks().length);
+            })
+            .error(function(jqXHR, text) {
+                alert("error: " + jqXHR.status);
+                clearInterval(self.pollId);
+                }
+            );
+        }
+        
+		var initialSearch = window.location.search.indexOf('=');
+		if (initialSearch != -1) self.idfilter(window.location.search.substring(initialSearch + 1));
+        self.pollId = setTimeout(self.load,1000);
+		
+    }
+    
+	var tvm = new TasksViewModel();
+	
+    ko.applyBindings(tvm, $('#main')[0]);
+    ko.applyBindings(new TitleBarViewModel(tvm), $('#titlebar')[0]);
+	
+    </script>
+</body>
+
+</html>
