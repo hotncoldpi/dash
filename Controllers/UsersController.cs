@@ -18,14 +18,6 @@ using TodoApi.Repository;
 
 namespace TodoApi.Controllers
 {
-	public class User
-	{
-		public string Name { get; set; }
-		public int    Count { get; set; }
-		public string Ids { get; set; }
-		public string Info { get; set; }
-	}
-
     [Route("WebApp/api/[controller]")]
     public class UsersController : Controller
     {
