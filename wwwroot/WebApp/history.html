@@ -1,0 +1,172 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Jobs</title>
+	<meta charset="utf-8" />
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6.15.0/babel.js"></script>
+    <script src="//ajax.aspnetcdn.com/ajax/jQuery/jquery-2.0.3.min.js"></script>
+    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+        var ajax = function (uri, method, data) {
+            var request = {
+                url: uri,
+                type: method,
+                contentType: "application/json",
+                dataType: 'json',
+                data: JSON.stringify(data),
+                error: function (jqXHR, text) {
+                    console.log("ajax error " + jqXHR.status);
+                    alert('err ' + jqXHR.status + ': ' + text);
+                }
+            };
+            return $.ajax(request);
+        }
+    </script>
+
+    <div id="root"></div>
+    <script type="text/babel">
+        class Hello extends React.Component {
+            constructor() {
+                super();
+                this.state = {
+                    mess: "my friend (from state)!",
+                    jobs: [],
+                    agents: [],
+                    jobTypeInput: 0,
+                    username: ''
+                };
+
+                this.updateMessage = this.updateMessage.bind(this);
+                this.updateDirs = this.updateDirs.bind(this);
+                this.updateInputValue = this.updateInputValue.bind(this);
+                this.delJob = this.delJob.bind(this);
+            }
+
+            updateMessage() {
+                var classThis = this;
+                $.getJSON('api/storage')
+                    .done(function (data) {
+                        var selection = 0;
+                        var index = window.location.href.indexOf('=');
+                        if (index != -1)
+                            selection = parseInt(window.location.href.substring(index + 1));
+                        //alert(selection);
+                        classThis.setState({
+                            mess: "my friend (from changed state)!",
+                            agents: data,
+                            jobTypeInput: selection
+                        });
+                        if (selection != 0)
+                            classThis.updateDirs(selection);
+                    });
+            }
+            
+            updateDirs(id) {
+                //alert('id='+id);
+                var classThis = this;
+                $.getJSON('api/storage/'+id)
+                    .done(function (data) {
+
+                        classThis.setState({
+                            jobs: data
+                        });
+
+                    });
+            }
+            
+            updateInputValue(evt) {
+                //alert(evt.target.value);
+                
+                if (evt.target.id == 'inputa') {
+                    this.setState({
+                        jobTypeInput: evt.target.value
+                    });
+                    if (evt.target.value != 0) this.updateDirs(evt.target.value);
+                }
+            }
+
+            delJob(id) {
+                if (!confirm('Are you sure?'))
+                    return;
+                var classThis = this;
+                var result = ajax('api/storage/'+this.state.jobTypeInput+'/'+id, 'DELETE', null);
+                result.done(function(dat) {
+                    classThis.updateDirs(classThis.state.jobTypeInput);
+                });
+            }
+
+            componentDidMount() {
+                this.updateMessage();
+                var classThis = this;
+                //setInterval(function(){ classThis.updateMessage(); }, 30000);
+
+                $.getJSON('api/products/0')
+                    .done(function (data) {
+                        classThis.setState({
+                            username: data.name
+                        });
+                    });
+            }
+            
+            render() {
+                var styles = {
+                    color:'red',
+                    verticalAlign:'top'
+                };
+                var narrow = {
+                    width:'10px'
+                };
+                var wide = {
+                    width:'400px'
+                };
+                var header = {
+                    display:'inline-block',
+                    padding:'8px'
+                };
+
+                return (
+                <div>
+                    <div>
+                        <div class="navbar">
+                            <div class="navbar-inner">
+                                <a style={header} class="brand" href="index.html">Agents Dashboard</a>
+                                <label style={header}>(user={this.state.username})</label>
+                            </div>
+                        </div>
+
+                        <br/>
+                        <table className='table table-striped'>
+                        <thead><tr><th>Day Archive</th><th>File Count</th><th>Unique Files</th></tr></thead>
+                        <tbody>
+                            {this.state.jobs.map((job) =>
+                            <tr key={job.name}>
+                            <td><a href={"Log/Files/" + this.state.jobTypeInput + "/" + job.name}>{job.name+".zip"}</a></td>
+                            <td><label>{job.size}</label></td>
+                            <td><label>{job.files}</label></td>
+                            <td><label onClick={() => this.delJob(job.name)}>X</label></td>
+                            </tr>)}
+                        </tbody></table>
+                        <br />
+                        <select id='inputa' value={this.state.jobTypeInput} onChange={this.updateInputValue}>
+                            <option value="0">Select Agent</option>
+                            {this.state.agents.map((planet) => <option key={planet}>{planet}</option>)}
+                        </select>
+                        <br/>
+                    </div>
+                </div>
+                )
+            }
+        }
+
+        ReactDOM.render(
+            <Hello mess="test" />,
+            document.getElementById("root")
+        );
+    </script>
+</body>
+</html>
